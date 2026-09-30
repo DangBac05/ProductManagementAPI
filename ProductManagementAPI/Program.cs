@@ -1,20 +1,75 @@
+using FluentValidation;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+using ProductManagementAPI.Behaviors;
+using ProductManagementAPI.Data;
+using ProductManagementAPI.Features.Products.Commands;
+using ProductManagementAPI.Mappings;
+using ProductManagementAPI.Middleware;
+using ProductManagementAPI.Validators;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// MediatR
+builder.Services.AddMediatR(cfg =>
+    cfg.RegisterServicesFromAssemblyContaining<CreateProductCommand>());
 
+// Transaction Behavior
+builder.Services.AddTransient(
+    typeof(IPipelineBehavior<,>),
+    typeof(TransactionBehavior<,>)
+);
+
+// Validation Behavior
+builder.Services.AddTransient(
+    typeof(IPipelineBehavior<,>),
+    typeof(ValidationBehavior<,>)
+);
+
+// FluentValidation
+builder.Services.AddScoped<
+    IValidator<CreateProductCommand>,
+    CreateProductValidator>();
+
+builder.Services.AddScoped<
+    IValidator<UpdateProductCommand>,
+    UpdateProductValidator>();
+
+// EF Core + Oracle
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseOracle(
+        builder.Configuration.GetConnectionString("OracleConnection")
+    )
+);
+
+// Dapper
+builder.Services.AddScoped<DapperContext>();
+
+// AutoMapper
+builder.Services.AddAutoMapper(
+    cfg => { },
+    typeof(MappingProfile).Assembly
+);
+
+// Controllers
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+
+// OpenAPI
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+// HTTPS Redirection
+// app.UseHttpsRedirection();
+
+// Exception Handling Middleware
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseAuthorization();
 
